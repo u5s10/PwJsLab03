@@ -3,10 +3,27 @@ use strict;
 use warnings;
 use open ":std", ":encoding(UTF-8)";
 
-my $filename = $ARGV[0];
-open(my $fh, '<:encoding(UTF-8)', $filename)
-    or die "Could not open file '$filename' $!";
+my %people;
+if(defined $ARGV[0]){
+    my $filename = $ARGV[0];
+    open(my $fh, '<:encoding(UTF-8)', $filename)
+	or die "Could not open file $filename: $!";
+    while(my $line = <$fh>){
+	$line =~ s/\s+$//;
+	print "$line\n";
+	$people{$line} = 1;
+    }
+}
 
+print "Enter filename: ";
+my $filename = <STDIN>;
+$filename =~ s/^\s+|\s+$//g;
+
+open(my $fh, '<:encoding(UTF-8)', $filename)
+    or die "Could not open file $filename: $!";
+
+my @array_to_file;
+my $i = 0;
 while(my $line = <$fh>){
     my $problemrow = "";
     my $name = "";
@@ -14,28 +31,48 @@ while(my $line = <$fh>){
     my $score = "";
     my $single_score = "";
     
-    while($line =~ /(<tr class='problemrow'>.*?<\/tr>)/g){
-	$problemrow = $1;
-	if($problemrow =~ /<a href='\/WIPING\d\/users\/(.*?)'>.*?<\/a>/){
-	    $account = $1;
-	}
-	if($problemrow =~ /<a href='\/WIPING\d\/users\/.*?'>(.*?)<\/a>/){
-	    $name = $1;
-	}
-	if($problemrow =~ /<td class='mini'>(\d+\.\d+)<\/td><\/tr>/){
-	    $score = $1;
-	}
-	printf ("Name: %-40s",$name);
+  LINE:    while($line =~ /(<tr class='problemrow'>.*?<\/tr>)/g){
+      $problemrow = $1;
+      if($problemrow =~ /<a href='\/WIPING\d\/users\/(.*?)'>.*?<\/a>/){
+	  $account = $1;
+      }
+      if($problemrow =~ /<a href='\/WIPING\d\/users\/.*?'>(.*?)<\/a>/){
+	  $name = $1;
+      }
+      if($problemrow =~ /<td class='mini'>(\d+\.\d+)<\/td><\/tr>/){
+	  $score = $1;
+      }
+      if(defined $ARGV[0]){
+	  if(!exists $people{$account}){
+	      next LINE;
+	  }
+      }
 
-	while($problemrow =~ /<font title='\d+ submissions'>(\d+\.\d+)<\/font>|<td class='mini'>(-)<\/td>/g){
-	    if(not defined $1){
-		$single_score = "0.0";
-	    }else{
-		$single_score = $1;
-	    }
-	    printf ("%-6s", $single_score);
-	}
-	print "\n";
-    }
+      $i = 0;
+      my $concat_single_score = "";
+      while($problemrow =~ /<font title='\d+ submissions'>(\d+\.\d+)<\/font>|<td class='mini'>(-)<\/td>/g){
+	  if(not defined $1){
+	      $single_score = "0,0";
+	  }else{
+	      $single_score = $1;
+	      $single_score =~ s/\./,/;
+	  }
+	  $concat_single_score .= ",\"$single_score\"";
+	  $i++;
+      }
+      push(@array_to_file,"\n\"$name\",\"$account\"" . $concat_single_score);
+  }
 }
 close $fh;
+
+my $wynik = "wynik.csv";
+open(DES, '>', $wynik) or die $!;
+
+my $first_row = "\"Name\",\"Username\"";
+foreach(1..$i){
+    $first_row .= ",\"ZAD$_\"";
+}
+
+print DES $first_row;
+print DES @array_to_file;
+close(DES);
